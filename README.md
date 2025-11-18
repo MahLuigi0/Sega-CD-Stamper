@@ -59,10 +59,6 @@
     
 -   **Delete / Backspace** — clear the currently selected cell (when editing).
     
--   **Ctrl/Cmd + Z** — undo last edit (if undo is implemented).
-    
--   **Ctrl/Cmd + Y** — redo (if redo is implemented).
-    
 -   **Enter** — confirm dialogs or apply current edit tool (context-dependent).
     
 ----------
