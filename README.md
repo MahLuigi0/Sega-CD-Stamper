@@ -59,6 +59,4 @@
     
 -   **Delete / Backspace** — clear the currently selected cell (when editing).
     
--   **Enter** — confirm dialogs or apply current edit tool (context-dependent).
-    
 ----------
