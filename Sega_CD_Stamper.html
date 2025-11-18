@@ -1,0 +1,1357 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Sega CD Stamper</title>
+  <style>
+    /* ------------------------- */
+    /* --- App-like Redesign --- */
+    /* ------------------------- */
+
+    /* -- Theme & Variables -- */
+    :root {
+      --bg-main: #2a2d34;
+      --bg-panel: #353841;
+      --bg-control: #4a4e59;
+      --border-color: #555966;
+      --text-primary: #e1e1e1;
+      --text-secondary: #a0a4b1;
+      --text-header: #ffffff;
+      --primary-accent: #3a86ff;
+      --primary-accent-hover: #5c9cff;
+      --success-accent: #2e7d32;
+      --danger-accent: #d32f2f;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+      --panel-padding: 15px;
+    }
+
+    /* -- Base & Layout -- */
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: var(--font-family);
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .app-container {
+      display: grid;
+      grid-template-columns: 300px 1fr 300px;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      gap: 8px;
+      padding: 8px;
+    }
+
+    header.app-header {
+      grid-column: 1 / -1;
+      background-color: var(--bg-panel);
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 1.2rem;
+      font-weight: 500;
+      color: var(--text-header);
+      border-radius: 6px;
+    }
+
+    .panel {
+      background-color: var(--bg-panel);
+      border-radius: 6px;
+      padding: var(--panel-padding);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .main-content {
+      grid-column: 2 / 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
+      background-image:
+        linear-gradient(45deg, #444 25%, transparent 25%),
+        linear-gradient(-45deg, #444 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #444 75%),
+        linear-gradient(-45deg, transparent 75%, #444 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+      padding: 20px;
+      border-radius: 6px;
+    }
+
+    footer.status-bar {
+      grid-column: 1 / -1;
+      background-color: var(--bg-panel);
+      padding: 5px 15px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      border-radius: 6px;
+    }
+
+    /* -- UI Components Styling -- */
+    fieldset {
+      border: 1px solid var(--border-color);
+      padding: 10px 12px 12px;
+      border-radius: 4px;
+      margin: 0;
+    }
+
+    legend {
+      padding: 0 5px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    input[type="file"], select, input[type="number"] {
+      width: 100%;
+      background-color: var(--bg-control);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    input[type="file"] { padding: 4px; }
+    select { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23e1e1e1' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1em; padding-right: 2em; }
+
+    .btn {
+      display: inline-block;
+      padding: 8px 14px;
+      border-radius: 6px;
+      background: var(--primary-accent);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    .btn:hover { background-color: var(--primary-accent-hover); }
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { background-color: #555; color: #999; cursor: not-allowed; }
+    .btn-danger { background: var(--danger-accent); }
+    .btn-danger:hover { background: #e57373; }
+    .btn-success { background: var(--success-accent); }
+    .btn-success:hover { background: #4caf50; }
+
+    .button-group { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    /* Canvas styling */
+    #canvas { border:1px solid #777; image-rendering: pixelated; display:block; max-width: 100%; max-height: 100%; cursor: crosshair; }
+    #stampSelector { border:1px solid var(--border-color); cursor:pointer; max-width: 100%; image-rendering: pixelated; background: #000; }
+    #tileGridCanvas { border:1px solid var(--border-color); image-rendering: pixelated; max-width: 100%; background: #000; display: block; }
+
+    /* Palette preview swatches */
+    #palettePreview { margin-top: 5px; display: grid; grid-template-columns: repeat(16, 1fr); gap: 0; width: 100%; border: 1px solid var(--border-color); }
+    .sw { width: 100%; padding-bottom: 100%; height: 0; display: block; margin: 0; border: none; box-sizing: border-box; }
+    
+    /* Progress indicator in status bar */
+    #progressBar { flex-grow: 1; height: 12px; background: var(--bg-control); border-radius: 4px; overflow: hidden; display: none; }
+    #progressFill { height: 100%; background: var(--primary-accent); transition: width 0.2s; width: 0%; }
+    #progressText { display: none; font-size: 0.8rem; }
+
+    /* Edit mode UI */
+    #activeStampPreview { border:1px solid var(--border-color); image-rendering: pixelated; margin-top: 8px; background: #000; }
+    #activeStampInfo { margin-top: 5px; font-size: 0.8rem; color: var(--text-secondary); text-align: center; }
+
+    /* Assembly modal */
+    .modal-backdrop { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 9999; }
+    .modal {
+      background: var(--bg-panel);
+      width: min(1100px, 95vw);
+      max-height: 90vh;
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border-color);
+    }
+    #asmText {
+      width: 100%;
+      flex-grow: 1;
+      font-family: monospace;
+      font-size: 13px;
+      white-space: pre;
+      overflow: auto;
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--bg-main);
+      color: var(--text-primary);
+      resize: vertical;
+    }
+    .modal-header, .modal-footer { display:flex; gap:8px; align-items:center; }
+    .modal-header { justify-content: space-between; margin-bottom: 8px; }
+    .modal-header strong { font-size: 1.1rem; }
+    .modal-footer { margin-top: 12px; }
+    .modal-footer .info { flex:1; font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Checkbox styling */
+    label input[type="checkbox"] { margin-right: 8px; accent-color: var(--primary-accent); vertical-align: middle; }
+
+    /* Hint next to render button */
+    #renderHint { margin-left: 10px; font-size: 0.85rem; color: #ffab40; display: none; vertical-align: middle; }
+
+    /* -------------------------
+       Zoom & Pan container
+       ------------------------- */
+    #canvasContainer {
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    #canvasContainer.dragging {
+      cursor: grabbing;
+    }
+
+    #canvas {
+      position: absolute;
+      transform-origin: 0 0;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    /* Zoom indicator */
+    .zoom-indicator {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: var(--text-primary);
+      padding: 5px 10px;
+      border-radius: 3px;
+      font-size: 0.85rem;
+      pointer-events: none;
+      z-index: 100;
+      font-family: var(--font-family);
+    }
+
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <header class="app-header">
+      Sega CD Stamper
+    </header>
+
+    <!-- Left Sidebar: Main Controls -->
+    <aside class="panel left-sidebar">
+      <fieldset>
+        <legend>Input Files</legend>
+        <label>Tile art (.bin / .unc): <input id="fileTiles" type="file" accept=".bin,.unc"></label>
+        <label>Palette (.bin / .pal): <input id="filePalette" type="file" accept=".bin,.pal,.unc"></label>
+        <label>Stamp map (.bin / .unc): <input id="fileStampMap" type="file" accept=".bin,.unc"></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Palette</legend>
+        <div id="palettePreview"></div>
+        <div id="paletteRowContainer" style="display:none; margin-top:8px;">
+          <label>Palette Row: <select id="paletteRowSelect"></select></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Stamp Map Settings</legend>
+        <label>Map Size (in stamps):
+          <select id="settingMapSize">
+            <option value="16x16">16x16 (256x256px)</option>
+            <option value="8x8">8x8 (256x256px)</option>
+            <option value="256x256" selected>256x256 (4096x4096px)</option>
+            <option value="128x128">128x128 (4096x4096px)</option>
+          </select>
+        </label>
+        <label>Stamp Size (in pixels):
+          <select id="settingStampSize">
+            <option value="16" selected>16x16</option>
+            <option value="32">32x32</option>
+          </select>
+        </label>
+        <div style="margin-top:12px;">
+          <button id="btnRenderMap" class="btn" title="Render the loaded stamp map" disabled>Render Stamp Map</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Export</legend>
+        <div class="button-group">
+          <button id="btnExport" class="btn" title="Export current canvas to PNG">Export PNG</button>
+          <button id="btnView68k" class="btn" title="View the current stamp map as 68K words">View Assembly</button>
+        </div>
+        <div style="margin-top:12px;">
+          <label><input id="optIncludeComments" type="checkbox" checked> Include row comments</label>
+          <label><input id="optLabelAtTop" type="checkbox"> Add label at top</label>
+          <label>Words per line: <input id="optWordsPerLine" type="number" value="0" min="0" style="width:70px; margin-left:6px;"> (0=map width)</label>
+        </div>
+      </fieldset>
+    </aside>
+
+    <!-- Main Canvas Area -->
+    <main class="main-content">
+      <div id="canvasContainer">
+        <canvas id="canvas" width="256" height="256"></canvas>
+        <div id="zoomIndicator" class="zoom-indicator">100%</div>
+      </div>
+    </main>
+
+    <!-- Right Sidebar: Edit Tools -->
+    <aside class="panel right-sidebar">
+      <div id="editTools">
+        <fieldset>
+          <legend>Map Actions</legend>
+          <div class="button-group">
+            <button id="btnNewMap" class="btn">New Empty Map</button>
+            <button id="btnClearMap" class="btn btn-danger">Clear Map</button>
+            <button id="btnSaveMap" class="btn btn-success">Save Map</button>
+          </div>
+          <div style="margin-top: 12px;">
+             <label><input type="checkbox" id="showGridToggle" > Show Grid</label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Active Stamp</legend>
+          <div style="display:flex; gap: 15px; align-items: flex-start;">
+            <canvas id="activeStampPreview" width="64" height="64"></canvas>
+            <div style="flex: 1;">
+              <label>H-Flip: <input type="checkbox" id="editHFlip"></label>
+              <label>Rotation:
+                <select id="editRotation">
+                  <option value="0" selected>0°</option>
+                  <option value="1">90°</option>
+                  <option value="2">180°</option>
+                  <option value="3">270°</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div id="activeStampInfo" style="margin-top: 5px;">Stamp 0 | H-Flip: false | Rotation: 0°</div>
+        </fieldset>
+        
+        <fieldset>
+          <legend>Stamp Palette</legend>
+          <canvas id="stampSelector" width="270" height="32"></canvas>
+          <div class="button-group" style="margin-top:12px;">
+            <button id="btnExportStampPalette" class="btn" title="Export the stamp palette as PNG">Export Palette PNG</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Tile Art</legend>
+          <canvas id="tileGridCanvas" width="256" height="256"></canvas>
+        </fieldset>
+      </div>
+    </aside>
+    
+    <!-- Status Bar -->
+    <footer class="status-bar">
+      <span>Ready.</span>
+      <div id="progressBar"><div id="progressFill"></div></div>
+      <div id="progressText">Rendering...</div>
+    </footer>
+  </div>
+
+  <!-- Assembly modal -->
+  <div id="asmModalBackdrop" class="modal-backdrop" role="dialog" aria-hidden="true">
+    <div class="modal" role="document">
+      <div class="modal-header">
+        <strong>Stamp Map — 68K Assembly View</strong>
+        <div class="button-group">
+          <button id="btnAsmCopy" class="btn">Copy</button>
+          <button id="btnAsmDownload" class="btn btn-success">Download .asm</button>
+          <button id="btnAsmClose" class="btn btn-danger">Close</button>
+        </div>
+      </div>
+
+      <textarea id="asmText" readonly></textarea>
+
+      <div class="modal-footer">
+        <div class="info">Map source: <span id="asmMapSource">—</span></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* -------------------------
+   DOM references & state
+   ------------------------- */
+const fileTiles = document.getElementById('fileTiles');
+const filePalette = document.getElementById('filePalette');
+const fileStampMap = document.getElementById('fileStampMap');
+const settingMapSize = document.getElementById('settingMapSize');
+const settingStampSize = document.getElementById('settingStampSize');
+const btnExport = document.getElementById('btnExport');
+const btnRenderMap = document.getElementById('btnRenderMap');
+const renderHint = document.getElementById('renderHint');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const palettePreview = document.getElementById('palettePreview');
+const paletteRowContainer = document.getElementById('paletteRowContainer');
+const paletteRowSelect = document.getElementById('paletteRowSelect');
+const progressBar = document.getElementById('progressBar');
+const progressFill = document.getElementById('progressFill');
+const progressText = document.getElementById('progressText');
+
+// New container references
+const canvasContainer = document.getElementById('canvasContainer');
+const zoomIndicator = document.getElementById('zoomIndicator');
+
+// Edit mode elements
+const editTools = document.getElementById('editTools');
+const editHFlip = document.getElementById('editHFlip');
+const editRotation = document.getElementById('editRotation');
+const activeStampPreview = document.getElementById('activeStampPreview');
+const activeStampInfo = document.getElementById('activeStampInfo');
+const stampSelector = document.getElementById('stampSelector');
+const stampSelectorCtx = stampSelector.getContext('2d');
+const btnNewMap = document.getElementById('btnNewMap');
+const btnClearMap = document.getElementById('btnClearMap');
+const btnSaveMap = document.getElementById('btnSaveMap');
+const showGridToggle = document.getElementById('showGridToggle');
+const btnExportStampPalette = document.getElementById('btnExportStampPalette');
+const tileGridCanvas = document.getElementById('tileGridCanvas');
+const tileGridCtx = tileGridCanvas.getContext('2d');
+
+// Assembly UI
+const btnView68k = document.getElementById('btnView68k');
+const asmModalBackdrop = document.getElementById('asmModalBackdrop');
+const asmText = document.getElementById('asmText');
+const btnAsmClose = document.getElementById('btnAsmClose');
+const btnAsmCopy = document.getElementById('btnAsmCopy');
+const btnAsmDownload = document.getElementById('btnAsmDownload');
+const optIncludeComments = document.getElementById('optIncludeComments');
+const optLabelAtTop = document.getElementById('optLabelAtTop');
+const optWordsPerLine = document.getElementById('optWordsPerLine');
+const asmMapSource = document.getElementById('asmMapSource');
+
+// State
+let tileData = null;
+let paletteData = null;
+let stampMapData = null;
+let editableStampMapData = null;
+let stampMapFilename = null;
+let renderingInProgress = false;
+let cancelRendering = false;
+let activeStampIndex = 1;
+let activeHFlip = false;
+let activeRotation = 0;
+let paletteRow = 0;
+let stampMapDisplayed = false;
+let lastRenderedConfig = null;
+let renderDirty = false;
+
+// Zoom and pan state
+let zoom = 1;
+let panX = 0;
+let panY = 0;
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+
+function sanitizeLabel(name) {
+  if (!name) return 'stamp_map';
+  const base = name.replace(/\.[^/.]+$/, '');
+  return base.replace(/[^A-Za-z0-9_]/g, '_');
+}
+
+/* -------------------------
+   Helpers & Initial State
+   ------------------------- */
+btnExport.disabled = true;
+btnRenderMap.disabled = true;
+
+function getCurrentRenderConfig() {
+  return {
+    mapSize: settingMapSize.value,
+    stampSize: parseInt(settingStampSize.value, 10),
+    paletteRow,
+    tileDataLen: tileData ? tileData.length : 0,
+    paletteDataLen: paletteData ? paletteData.length : 0,
+    stampMapLen: stampMapData ? stampMapData.length : 0
+  };
+}
+
+function configsEqual(a, b) {
+  if (!a || !b) return false;
+  return a.mapSize === b.mapSize &&
+         a.stampSize === b.stampSize &&
+         a.paletteRow === b.paletteRow &&
+         a.tileDataLen === b.tileDataLen &&
+         a.paletteDataLen === b.paletteDataLen &&
+         a.stampMapLen === b.stampMapLen;
+}
+
+function setRenderDirty(flag) {
+  renderDirty = flag;
+  renderHint.style.display = flag ? 'inline' : 'none';
+  if (!btnRenderMap.disabled) btnRenderMap.disabled = false;
+}
+
+/* -------------------------
+   Zoom / Pan helpers
+   ------------------------- */
+function applyCanvasTransform() {
+  canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+}
+
+function updateZoomIndicator() {
+  zoomIndicator.textContent = `${Math.round(zoom * 100)}%`;
+}
+
+function zoomAtPoint(factor, mouseX, mouseY) {
+  const containerRect = canvasContainer.getBoundingClientRect();
+  const mouseXInContainer = mouseX - containerRect.left;
+  const mouseYInContainer = mouseY - containerRect.top;
+  
+  // Calculate the point in canvas coordinates before zoom
+  const canvasXBefore = (mouseXInContainer - panX) / zoom;
+  const canvasYBefore = (mouseYInContainer - panY) / zoom;
+  
+  // Apply zoom limits
+  const newZoom = Math.max(0.5, Math.min(8, zoom * factor));
+  if (newZoom === zoom) return;
+  
+  // Calculate new pan to keep the same point under mouse
+  const newPanX = mouseXInContainer - canvasXBefore * newZoom;
+  const newPanY = mouseYInContainer - canvasYBefore * newZoom;
+  
+  zoom = newZoom;
+  panX = newPanX;
+  panY = newPanY;
+  
+  applyCanvasTransform();
+  updateZoomIndicator();
+}
+
+function resetView() {
+  zoom = 1;
+  panX = 0;
+  panY = 0;
+  applyCanvasTransform();
+  updateZoomIndicator();
+}
+
+function clearMainCanvas() {
+    canvas.style.display = 'none';
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    stampMapDisplayed = false;
+}
+
+/* -------------------------
+   File input handlers
+   ------------------------- */
+fileTiles.addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  tileData = new Uint8Array(await f.arrayBuffer());
+  clampActiveStampIndex();
+  btnExport.disabled = false;
+  renderIfReady();
+  if (stampMapDisplayed) {
+    setRenderDirty(!configsEqual(getCurrentRenderConfig(), lastRenderedConfig));
+  }
+});
+
+filePalette.addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  paletteData = new Uint8Array(await f.arrayBuffer());
+  paletteRow = 0; // reset to first row
+  renderIfReady();
+  if (stampMapDisplayed) {
+    setRenderDirty(!configsEqual(getCurrentRenderConfig(), lastRenderedConfig));
+  }
+});
+
+fileStampMap.addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) {
+    stampMapData = null;
+    editableStampMapData = null;
+    stampMapFilename = null;
+    btnRenderMap.disabled = true;
+    lastRenderedConfig = null;
+    setRenderDirty(false);
+    clearMainCanvas();
+  } else {
+    stampMapData = new Uint8Array(await f.arrayBuffer());
+    editableStampMapData = new Uint8Array(stampMapData);
+    stampMapFilename = f.name;
+    btnRenderMap.disabled = false;
+    if (stampMapDisplayed) {
+      setRenderDirty(!configsEqual(getCurrentRenderConfig(), lastRenderedConfig));
+    }
+  }
+});
+
+/* -------------------------
+   Export button handler
+   ------------------------- */
+btnExport.addEventListener('click', async () => {
+    if (stampMapDisplayed && (editableStampMapData || stampMapData)) {
+        const mapToExport = editableStampMapData || stampMapData;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        const palette = paletteData ? parsePaletteFromData(paletteData) : null;
+        
+        await renderStampMap(tempCtx, tileData, palette, mapToExport, false); // Render without progress/overlay
+
+        tempCanvas.toBlob((blob) => {
+            if (!blob) { alert('Unable to export image.'); return; }
+            const a = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            a.href = url;
+            a.download = `genesis-map-${new Date().toISOString().replace(/[:.]/g,'-')}.png`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }, 'image/png');
+
+    } else if (tileData) {
+        tileGridCanvas.toBlob((blob) => {
+            if (!blob) { alert('Unable to export image.'); return; }
+            const a = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            a.href = url;
+            a.download = `genesis-tiles-${new Date().toISOString().replace(/[:.]/g,'-')}.png`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }, 'image/png');
+    } else {
+        alert('Nothing to export.');
+    }
+});
+
+/* -------------------------
+   Render button handler
+   ------------------------- */
+btnRenderMap.addEventListener('click', () => {
+  if (!stampMapData) { alert('No stamp map loaded.'); return; }
+  if (!tileData) { alert('No tile data loaded.'); return; }
+  
+  const palette = paletteData ? parsePaletteFromData(paletteData) : null;
+  const mapToRender = editableStampMapData || stampMapData;
+
+  renderStampMap(ctx, tileData, palette, mapToRender, true).then(() => {
+    stampMapDisplayed = true;
+    lastRenderedConfig = getCurrentRenderConfig();
+    setRenderDirty(false);
+    if (showGridToggle.checked) {
+      drawGridOverlay(ctx);
+    }
+  }).catch((err) => console.error('Render failure', err));
+});
+
+/* -------------------------
+   Palette parsing & preview
+   ------------------------- */
+function parsePaletteFromData(pData) {
+  if (!pData || pData.length < 2) return null;
+  const entries = Math.floor(pData.length / 2);
+  const palette = new Array(entries);
+  for (let i = 0; i < entries; i++) {
+    const wordValue = (pData[i * 2] << 8) | pData[i * 2 + 1];
+    const blueNib = (wordValue >> 8) & 0x0E;
+    const greenNib = (wordValue >> 4) & 0x0E;
+    const redNib = wordValue & 0x0E;
+    palette[i] = { r: redNib * 17, g: greenNib * 17, b: blueNib * 17 };
+  }
+  return palette;
+}
+
+function showPalettePreview(palette) {
+  palettePreview.innerHTML = '';
+  if (!palette) {
+    paletteRowContainer.style.display = 'none';
+    return;
+  }
+  const max = Math.min(palette.length, 256);
+  const rows = Math.ceil(max / 16);
+  if (rows > 1) {
+    paletteRowContainer.style.display = 'block';
+    paletteRowSelect.innerHTML = '';
+    for (let r = 0; r < rows; r++) {
+      const opt = document.createElement('option');
+      opt.value = r;
+      opt.textContent = `Row ${r} (${r*16}–${Math.min((r+1)*16-1, max-1)})`;
+      paletteRowSelect.appendChild(opt);
+    }
+    paletteRowSelect.value = String(paletteRow);
+  } else {
+    paletteRowContainer.style.display = 'none';
+  }
+
+  for (let i = 0; i < max; i++) {
+    const p = palette[i];
+    const div = document.createElement('div');
+    div.className = 'sw';
+    div.title = `Index ${i}: rgb(${p.r},${p.g},${p.b})`;
+    div.style.backgroundColor = `rgb(${p.r},${p.g},${p.b})`;
+    palettePreview.appendChild(div);
+  }
+}
+
+paletteRowSelect.addEventListener('change', (e) => {
+  paletteRow = parseInt(e.target.value, 10) || 0;
+  renderIfReady();
+  if (stampMapDisplayed) {
+    setRenderDirty(!configsEqual(getCurrentRenderConfig(), lastRenderedConfig));
+  }
+});
+
+/* -------------------------
+   Progress display helpers
+   ------------------------- */
+function showProgress(show) {
+  progressBar.style.display = show ? 'block' : 'none';
+  progressText.style.display = show ? 'block' : 'none';
+}
+
+function updateProgress(current, total) {
+  const percent = Math.round((current / total) * 100);
+  progressFill.style.width = percent + '%';
+  progressText.textContent = `Rendering: ${current} / ${total} stamps (${percent}%)`;
+}
+
+/* -------------------------
+   Active stamp management
+   ------------------------- */
+function clampActiveStampIndex() {
+  if (!tileData) return;
+  const stampSize = parseInt(settingStampSize.value, 10);
+  const totalTiles = Math.floor(tileData.length / 32);
+  const tilesPerDim = stampSize / 8;
+  const tilesPerStamp = tilesPerDim * tilesPerDim;
+  const maxPhysicalStamps = Math.floor(totalTiles / tilesPerStamp) || 1;
+  const maxLogicalID = (stampSize === 32) ? maxPhysicalStamps * 4 : maxPhysicalStamps;
+  activeStampIndex = Math.max(1, Math.min(activeStampIndex, maxLogicalID));
+}
+
+function updateActiveStampPreview() {
+  const previewCtx = activeStampPreview.getContext('2d');
+  previewCtx.imageSmoothingEnabled = false;
+  previewCtx.fillStyle = '#000';
+  previewCtx.fillRect(0, 0, 64, 64);
+  if (!tileData || !paletteData || activeStampIndex === 0) return;
+  const palette = parsePaletteFromData(paletteData);
+  const word = ((activeHFlip ? 1 : 0) << 15) | ((activeRotation & 0x03) << 13) | (activeStampIndex & 0x07FF);
+  const stampSize = parseInt(settingStampSize.value, 10);
+  const scale = Math.min(2, 64 / stampSize);
+  const renderSize = stampSize * scale;
+  const offsetX = (64 - renderSize) / 2;
+  const offsetY = (64 - renderSize) / 2;
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = stampSize;
+  tempCanvas.height = stampSize;
+  const tempCtx = tempCanvas.getContext('2d');
+  renderSingleStamp(tempCtx, word, 0, 0, stampSize, tileData, palette);
+  previewCtx.drawImage(tempCanvas, offsetX, offsetY, renderSize, renderSize);
+  activeStampInfo.textContent = `Stamp ${activeStampIndex} | H-Flip: ${activeHFlip} | Rotation: ${activeRotation * 90}°`;
+}
+
+/* -------------------------
+   Stamp selector rendering
+   ------------------------- */
+function renderStampSelector() {
+  if (!tileData || !paletteData) {
+    stampSelector.style.display = 'none';
+    return;
+  }
+  stampSelector.style.display = 'block';
+  const palette = parsePaletteFromData(paletteData);
+  const stampSize = parseInt(settingStampSize.value, 10);
+  const totalTiles = Math.floor(tileData.length / 32);
+  const tilesPerDim = stampSize / 8;
+  const tilesPerStamp = tilesPerDim * tilesPerDim;
+  const maxPhysicalStamps = Math.floor(totalTiles / tilesPerStamp);
+  const stampsPerRow = Math.floor(stampSelector.parentElement.clientWidth / stampSize) || 1;
+  const rows = Math.ceil(maxPhysicalStamps / stampsPerRow);
+  stampSelector.width = stampsPerRow * stampSize;
+  stampSelector.height = rows * stampSize;
+  stampSelectorCtx.imageSmoothingEnabled = false;
+  stampSelectorCtx.fillStyle = '#2a2a2a';
+  stampSelectorCtx.fillRect(0, 0, stampSelector.width, stampSelector.height);
+  for (let i = 0; i < maxPhysicalStamps; i++) {
+    const row = Math.floor(i / stampsPerRow);
+    const col = i % stampsPerRow;
+    const x = col * stampSize;
+    const y = row * stampSize;
+    const logicalID = (stampSize === 32) ? (i * 4 + 4) : (i + 4);
+    renderSingleStamp(stampSelectorCtx, logicalID, x, y, stampSize, tileData, palette);
+    let shouldHighlight = (stampSize === 32) ? (Math.floor((activeStampIndex - 1) / 4) === i) : (logicalID === activeStampIndex);
+    if (shouldHighlight) {
+      stampSelectorCtx.strokeStyle = '#ffdd44';
+      stampSelectorCtx.lineWidth = 2;
+      stampSelectorCtx.strokeRect(x + 1, y + 1, stampSize - 2, stampSize - 2);
+    }
+  }
+}
+
+/* -------------------------
+   Core Rendering Functions
+   ------------------------- */
+function renderSingleStamp(targetCtx, word, destX, destY, stampSize, tileData, palette) {
+  const H_MASK = 0x8000, ROT_MASK = 0x6000, STAMP_MASK = 0x07FF;
+  const hFlip = (word & H_MASK) !== 0;
+  const rotation = (word & ROT_MASK) >> 13;
+  const stampIndex = word & STAMP_MASK;
+  if (stampIndex === 0) return;
+  const tilesPerDim = stampSize / 8;
+  let stampAddr = stampIndex - 1;
+  if (stampSize === 32) stampAddr &= ~0x03;
+  const baseTileIndex = stampAddr * 4;
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = stampSize;
+  tempCanvas.height = stampSize;
+  const tempCtx = tempCanvas.getContext('2d');
+  const imgData = tempCtx.createImageData(stampSize, stampSize);
+  for (let sty = 0; sty < tilesPerDim; sty++) {
+    for (let stx = 0; stx < tilesPerDim; stx++) {
+      const tileIndexInStamp = stx * tilesPerDim + sty;
+      drawTileOntoImageData(imgData, baseTileIndex + tileIndexInStamp, tileData, palette, stx * 8, sty * 8);
+    }
+  }
+  tempCtx.putImageData(imgData, 0, 0);
+  const centerX = destX + stampSize / 2, centerY = destY + stampSize / 2;
+  targetCtx.save();
+  targetCtx.translate(centerX, centerY);
+  targetCtx.rotate(-rotation * Math.PI / 2);
+  if (hFlip) {
+    targetCtx.scale((rotation % 2 === 0) ? -1 : 1, (rotation % 2 === 0) ? 1 : -1);
+  }
+  targetCtx.drawImage(tempCanvas, -stampSize / 2, -stampSize / 2);
+  targetCtx.restore();
+}
+
+function renderStampMapCell(cellIndex, word) {
+  if (!stampMapData) return;
+  const [mapW] = settingMapSize.value.split('x').map(Number);
+  const stampSize = parseInt(settingStampSize.value, 10);
+  const my = Math.floor(cellIndex / mapW);
+  const mx = cellIndex % mapW;
+  const destX = mx * stampSize, destY = my * stampSize;
+  ctx.clearRect(destX, destY, stampSize, stampSize);
+  if (word !== 0) {
+    const palette = paletteData ? parsePaletteFromData(paletteData) : null;
+    renderSingleStamp(ctx, word, destX, destY, stampSize, tileData, palette);
+  }
+}
+
+async function renderIfReady() {
+  const palette = paletteData ? parsePaletteFromData(paletteData) : null;
+  showPalettePreview(palette);
+  if (tileData) {
+    renderTileGrid(tileData, palette);
+    if (stampMapData && !editableStampMapData) {
+      editableStampMapData = new Uint8Array(stampMapData);
+    }
+    renderStampSelector();
+    updateActiveStampPreview();
+  }
+}
+
+function renderStampMap(targetCtx, tileData, palette, mapData, showProgressUI = true) {
+  return new Promise((resolve, reject) => {
+    renderingInProgress = true;
+    cancelRendering = false;
+    targetCtx.canvas.style.display = 'block';
+    const [mapW, mapH] = settingMapSize.value.split('x').map(Number);
+    const stampSize = parseInt(settingStampSize.value, 10);
+    targetCtx.canvas.width = mapW * stampSize;
+    targetCtx.canvas.height = mapH * stampSize;
+    targetCtx.clearRect(0, 0, targetCtx.canvas.width, targetCtx.canvas.height);
+    if(showProgressUI) showProgress(true);
+    const mapView = new DataView(mapData.buffer);
+    const totalStamps = mapW * mapH;
+    let currentStamp = 0;
+    const processBatch = () => {
+      if (cancelRendering) {
+        if(showProgressUI) showProgress(false);
+        renderingInProgress = false;
+        reject(new Error('Rendering cancelled'));
+        return;
+      }
+      const batchEnd = Math.min(currentStamp + 256, totalStamps);
+      for (let i = currentStamp; i < batchEnd; i++) {
+        if ((i * 2 + 1) >= mapView.byteLength) continue;
+        const my = Math.floor(i / mapW), mx = i % mapW;
+        const word = mapView.getUint16(i * 2, false);
+        renderSingleStamp(targetCtx, word, mx * stampSize, my * stampSize, stampSize, tileData, palette);
+      }
+      currentStamp = batchEnd;
+      if(showProgressUI) updateProgress(currentStamp, totalStamps);
+      if (currentStamp < totalStamps) {
+        requestAnimationFrame(processBatch);
+      } else {
+        if(showProgressUI) showProgress(false);
+        renderingInProgress = false;
+        applyCanvasTransform(); // Apply zoom/pan after rendering
+        resolve();
+      }
+    };
+    requestAnimationFrame(processBatch);
+  });
+}
+
+function drawGridOverlay(targetCtx) {
+  const [mapW, mapH] = settingMapSize.value.split('x').map(Number);
+  const stampSize = parseInt(settingStampSize.value, 10);
+  targetCtx.save();
+  targetCtx.strokeStyle = 'rgba(255,255,255,0.4)';
+  targetCtx.lineWidth = 1;
+  for (let x = 0; x <= mapW; x++) {
+    targetCtx.beginPath();
+    targetCtx.moveTo(x * stampSize + 0.5, 0);
+    targetCtx.lineTo(x * stampSize + 0.5, targetCtx.canvas.height);
+    targetCtx.stroke();
+  }
+  for (let y = 0; y <= mapH; y++) {
+    targetCtx.beginPath();
+    targetCtx.moveTo(0, y * stampSize + 0.5);
+    targetCtx.lineTo(targetCtx.canvas.width, y * stampSize + 0.5);
+    targetCtx.stroke();
+  }
+  targetCtx.restore();
+}
+
+function renderTileGrid(data, palette) {
+  const tileW = 8, tileH = 8, bytesPerTile = 32;
+  const tilesPerRow = 32;
+  const numTiles = Math.floor(data.length / bytesPerTile);
+  if (numTiles === 0) {
+    tileGridCanvas.width = 1; tileGridCanvas.height = 1;
+    tileGridCtx.clearRect(0,0,1,1);
+    return;
+  }
+  const imageW = tilesPerRow * tileW;
+  const imageH = Math.ceil(numTiles / tilesPerRow) * tileH;
+  tileGridCanvas.width = imageW;
+  tileGridCanvas.height = imageH;
+  const img = tileGridCtx.createImageData(imageW, imageH);
+  for (let t = 0; t < numTiles; t++) {
+    const tileX = (t % tilesPerRow) * tileW;
+    const tileY = Math.floor(t / tilesPerRow) * tileH;
+    drawTileOntoImageData(img, t, data, palette, tileX, tileY);
+  }
+  tileGridCtx.putImageData(img, 0, 0);
+}
+
+function drawTileOntoImageData(imgData, tileIndex, tileData, palette, targetX, targetY) {
+  const tileW = 8, tileH = 8, bytesPerTile = 32;
+  const base = tileIndex * bytesPerTile;
+  if (base + bytesPerTile > tileData.length) return;
+  const imageW = imgData.width;
+  const px = imgData.data;
+  for (let row = 0; row < tileH; row++) {
+    const rowOffset = base + row * 4;
+    for (let col = 0; col < tileW; col++) {
+      const byteIndex = rowOffset + (col >> 1);
+      const b = tileData[byteIndex];
+      const pixelVal = (col & 1) === 0 ? ((b >> 4) & 0x0F) : (b & 0x0F);
+      let R = 0, G = 0, B = 0;
+      if (pixelVal !== 0) {
+        const paletteIndex = paletteRow * 16 + pixelVal;
+        if (palette && paletteIndex < palette.length) {
+          const pcol = palette[paletteIndex];
+          R = pcol.r; G = pcol.g; B = pcol.b;
+        } else {
+          R = G = B = Math.round((pixelVal / 15) * 255);
+        }
+      }
+      const di = ((targetY + row) * imageW + (targetX + col)) * 4;
+      px[di] = R; px[di + 1] = G; px[di + 2] = B;
+      px[di + 3] = (pixelVal === 0) ? 0 : 255;
+    }
+  }
+}
+
+/* -------------------------
+   Event Handlers
+   ------------------------- */
+editHFlip.addEventListener('change', (e) => {
+  activeHFlip = e.target.checked;
+  updateActiveStampPreview();
+});
+
+editRotation.addEventListener('change', (e) => {
+  activeRotation = parseInt(e.target.value, 10);
+  updateActiveStampPreview();
+});
+
+stampSelector.addEventListener('click', (e) => {
+  if (!tileData || !paletteData) return;
+  const rect = stampSelector.getBoundingClientRect();
+  const scaleX = stampSelector.width / rect.width;
+  const scaleY = stampSelector.height / rect.height;
+  const x = (e.clientX - rect.left) * scaleX;
+  const y = (e.clientY - rect.top) * scaleY;
+  const stampSize = parseInt(settingStampSize.value, 10);
+  const stampsPerRow = Math.floor(stampSelector.width / stampSize);
+  const col = Math.floor(x / stampSize);
+  const row = Math.floor(y / stampSize);
+  const physicalIndex = row * stampsPerRow + col;
+  const totalTiles = Math.floor(tileData.length / 32);
+  const maxPhysicalStamps = Math.floor(totalTiles / (stampSize/8 * stampSize/8));
+  if (physicalIndex < maxPhysicalStamps) {
+    activeStampIndex = (stampSize === 32) ? (physicalIndex * 4 + 4) : (physicalIndex + 4);
+    updateActiveStampPreview();
+    renderStampSelector();
+  }
+});
+
+/* Zoom-aware canvas edit function (replaces previous handleCanvasEdit) */
+function handleCanvasEdit(e, isClear = false) {
+  if (!editableStampMapData) return;
+  e.preventDefault();
+  
+  const [mapW, mapH] = settingMapSize.value.split('x').map(Number);
+  const stampSize = parseInt(settingStampSize.value, 10);
+  
+  // Get container rect for accurate coordinate conversion
+  const containerRect = canvasContainer.getBoundingClientRect();
+  
+  // Convert mouse position to canvas coordinates accounting for zoom/pan
+  const mouseX = e.clientX - containerRect.left;
+  const mouseY = e.clientY - containerRect.top;
+  const canvasX = (mouseX - panX) / zoom;
+  const canvasY = (mouseY - panY) / zoom;
+  
+  // Calculate which stamp cell was clicked
+  let mx = Math.floor(canvasX / stampSize);
+  let my = Math.floor(canvasY / stampSize);
+  
+  // Clamp to valid map bounds
+  mx = Math.max(0, Math.min(mapW - 1, mx));
+  my = Math.max(0, Math.min(mapH - 1, my));
+  
+  const cellIndex = my * mapW + mx;
+  const mapView = new DataView(editableStampMapData.buffer);
+  let stampIndexToWrite = activeStampIndex;
+  if (stampSize === 32) stampIndexToWrite = ((activeStampIndex - 1) & ~0x03) + 4;
+  
+  const word = isClear ? 0 : (((activeHFlip ? 1 : 0) << 15) | ((activeRotation & 0x03) << 13) | (stampIndexToWrite & 0x07FF));
+  mapView.setUint16(cellIndex * 2, word, false);
+  
+  renderStampMapCell(cellIndex, word);
+  
+  if (showGridToggle.checked) {
+    const destX = mx * stampSize;
+    const destY = my * stampSize;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(destX + 0.5, destY + 0.5, stampSize, stampSize);
+    ctx.restore();
+  }
+}
+
+canvas.addEventListener('click', (e) => handleCanvasEdit(e, false));
+canvas.addEventListener('contextmenu', (e) => handleCanvasEdit(e, true));
+
+/* -------------------------
+   New zoom & pan event listeners
+   ------------------------- */
+// Wheel zoom handler
+canvasContainer.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 0.9 : 1.1;
+  zoomAtPoint(factor, e.clientX, e.clientY);
+});
+
+// Drag pan handlers
+canvasContainer.addEventListener('mousedown', (e) => {
+  if (e.button === 0 && stampMapDisplayed) { // Left mouse button and map exists
+    isDragging = true;
+    dragStartX = e.clientX - panX;
+    dragStartY = e.clientY - panY;
+    canvasContainer.classList.add('dragging');
+  }
+});
+
+canvasContainer.addEventListener('mousemove', (e) => {
+  if (isDragging) {
+    panX = e.clientX - dragStartX;
+    panY = e.clientY - dragStartY;
+    applyCanvasTransform();
+  }
+});
+
+canvasContainer.addEventListener('mouseup', () => {
+  isDragging = false;
+  canvasContainer.classList.remove('dragging');
+});
+
+canvasContainer.addEventListener('mouseleave', () => {
+  isDragging = false;
+  canvasContainer.classList.remove('dragging');
+});
+
+// Double-click to reset view
+canvasContainer.addEventListener('dblclick', (e) => {
+  e.preventDefault();
+  resetView();
+});
+
+/* -------------------------
+   Remaining Event handlers
+   ------------------------- */
+showGridToggle.addEventListener('change', () => {
+    if (stampMapDisplayed && (editableStampMapData || stampMapData)) {
+        const mapToRedraw = editableStampMapData || stampMapData;
+        const palette = paletteData ? parsePaletteFromData(paletteData) : null;
+        renderStampMap(ctx, tileData, palette, mapToRedraw, false).then(() => {
+            if (showGridToggle.checked) {
+                drawGridOverlay(ctx);
+            }
+        });
+    }
+});
+
+btnNewMap.addEventListener('click', () => {
+  if (!confirm('Create a new empty map? This will clear all current data.')) return;
+  const [mapW, mapH] = settingMapSize.value.split('x').map(Number);
+  editableStampMapData = new Uint8Array(mapW * mapH * 2);
+  stampMapData = new Uint8Array(editableStampMapData);
+  stampMapFilename = null;
+  btnRenderMap.disabled = !tileData;
+  const palette = paletteData ? parsePaletteFromData(paletteData) : null;
+  renderStampMap(ctx, tileData, palette, editableStampMapData, true).then(() => {
+    if (showGridToggle.checked) drawGridOverlay(ctx);
+    stampMapDisplayed = true;
+    resetView(); // Reset zoom/pan for new map
+  });
+});
+
+btnClearMap.addEventListener('click', () => {
+  if (!editableStampMapData || !confirm('Clear entire map? This cannot be undone.')) return;
+  editableStampMapData.fill(0);
+  const palette = paletteData ? parsePaletteFromData(paletteData) : null;
+  renderStampMap(ctx, tileData, palette, editableStampMapData, true).then(() => {
+    if (showGridToggle.checked) drawGridOverlay(ctx);
+    stampMapDisplayed = true;
+    resetView(); // Reset zoom/pan for cleared map
+  });
+});
+
+btnSaveMap.addEventListener('click', () => {
+  if (!editableStampMapData) { alert('No map data to save.'); return; }
+  const blob = new Blob([editableStampMapData], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `genesis-map-${new Date().toISOString().replace(/[:.]/g,'-')}.bin`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  alert(`Map saved as ${a.download}`);
+});
+
+settingMapSize.addEventListener('change', () => {
+  if (editableStampMapData) {
+    const [newW, newH] = settingMapSize.value.split('x').map(Number);
+    const newData = new Uint8Array(newW * newH * 2);
+    newData.set(editableStampMapData.subarray(0, Math.min(editableStampMapData.length, newData.length)));
+    editableStampMapData = newData;
+    stampMapData = new Uint8Array(newData);
+    btnRenderMap.disabled = false;
+  }
+  clampActiveStampIndex();
+  if (stampMapDisplayed) {
+    setRenderDirty(!configsEqual(getCurrentRenderConfig(), lastRenderedConfig));
+  }
+});
+
+settingStampSize.addEventListener('change', () => {
+  clampActiveStampIndex();
+  renderStampSelector();
+  updateActiveStampPreview();
+  if (stampMapDisplayed) {
+    setRenderDirty(!configsEqual(getCurrentRenderConfig(), lastRenderedConfig));
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!editableStampMapData) return;
+  if (e.key.startsWith('Arrow')) {
+    e.preventDefault();
+    const stampSize = parseInt(settingStampSize.value, 10);
+    const totalTiles = tileData ? Math.floor(tileData.length / 32) : 0;
+    const maxPhysicalStamps = Math.floor(totalTiles / (stampSize/8*stampSize/8));
+    const stampsPerRow = Math.floor(stampSelector.width / stampSize);
+    const currentPhysicalIndex = (stampSize === 32) ? Math.floor((activeStampIndex - 1) / 4) : (activeStampIndex - 1);
+    let newPhysicalIndex = currentPhysicalIndex;
+    if (e.key === 'ArrowUp') newPhysicalIndex = Math.max(0, currentPhysicalIndex - stampsPerRow);
+    else if (e.key === 'ArrowDown') newPhysicalIndex = Math.min(maxPhysicalStamps - 1, currentPhysicalIndex + stampsPerRow);
+    else if (e.key === 'ArrowLeft') newPhysicalIndex = Math.max(0, currentPhysicalIndex - 1);
+    else if (e.key === 'ArrowRight') newPhysicalIndex = Math.min(maxPhysicalStamps - 1, currentPhysicalIndex + 1);
+    if (newPhysicalIndex !== currentPhysicalIndex) {
+      activeStampIndex = (stampSize === 32) ? (newPhysicalIndex * 4 + 4) : (newPhysicalIndex + 4);
+      updateActiveStampPreview();
+      renderStampSelector();
+    }
+  }
+  if (e.key === ' ') {
+    e.preventDefault();
+    activeHFlip = !activeHFlip;
+    editHFlip.checked = activeHFlip;
+    updateActiveStampPreview();
+  }
+  if (e.key.toLowerCase() === 'r') {
+    e.preventDefault();
+    activeRotation = (activeRotation + 1) % 4;
+    editRotation.value = activeRotation;
+    updateActiveStampPreview();
+  }
+});
+
+/* -------------------------
+   68K Assembly generation & UI
+   ------------------------- */
+function generate68kAssembly(mapUint8, mapW, mapH, options = {}) {
+  const dv = new DataView(mapUint8.buffer, mapUint8.byteOffset, mapUint8.byteLength);
+  const { includeComments, labelAtTop } = options;
+  let wordsPerLine = parseInt(options.wordsPerLine || 0, 10) || mapW;
+  const lines = [];
+  if (labelAtTop) {
+    lines.push((options.labelName ? sanitizeLabel(options.labelName) : 'stamp_map') + ':');
+  }
+  for (let row = 0; row < mapH; row++) {
+    let rowWords = [];
+    for (let col = 0; col < mapW; col++) {
+      const byteOff = (row * mapW + col) * 2;
+      const w = (byteOff + 1) < dv.byteLength ? dv.getUint16(byteOff, false) : 0;
+      rowWords.push('$' + w.toString(16).toUpperCase().padStart(4, '0'));
+    }
+    for (let i = 0; i < rowWords.length; i += wordsPerLine) {
+      const chunk = rowWords.slice(i, i + wordsPerLine);
+      const comment = includeComments ? ` ; row ${row} cols ${i}-${Math.min(rowWords.length-1,i+wordsPerLine-1)}` : '';
+      lines.push('  dc.w ' + chunk.join(', ') + (wordsPerLine === mapW ? ` ; row ${row}` : comment));
+    }
+  }
+  return lines.join('\n');
+}
+
+function openAssemblyModal(text, mapLabel) {
+  asmText.value = text;
+  asmMapSource.textContent = mapLabel || 'ram';
+  asmModalBackdrop.style.display = 'flex';
+  asmModalBackdrop.setAttribute('aria-hidden', 'false');
+  asmText.scrollTop = 0;
+}
+
+function closeAssemblyModal() {
+  asmModalBackdrop.style.display = 'none';
+  asmModalBackdrop.setAttribute('aria-hidden', 'true');
+}
+
+btnView68k.addEventListener('click', () => {
+  const map = editableStampMapData || stampMapData;
+  if (!map) { alert('No stamp map loaded.'); return; }
+  const [mapW, mapH] = settingMapSize.value.split('x').map(Number);
+  try {
+    const asm = generate68kAssembly(map, mapW, mapH, {
+      includeComments: optIncludeComments.checked,
+      labelAtTop: optLabelAtTop.checked,
+      wordsPerLine: parseInt(optWordsPerLine.value || '0', 10),
+      labelName: stampMapFilename
+    });
+    openAssemblyModal(asm, stampMapFilename || 'editable map');
+  } catch (err) {
+    console.error('Assembly generation failed', err);
+    alert('Failed to generate assembly.');
+  }
+});
+
+btnAsmClose.addEventListener('click', closeAssemblyModal);
+
+btnAsmCopy.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(asmText.value);
+    btnAsmCopy.textContent = 'Copied ✓';
+    setTimeout(() => btnAsmCopy.textContent = 'Copy', 1200);
+  } catch (err) { console.error('Copy failed', err); alert('Copy failed.'); }
+});
+
+btnAsmDownload.addEventListener('click', () => {
+  const blob = new Blob([asmText.value], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `stamp_map_${new Date().toISOString().replace(/[:.]/g,'-')}.asm`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+asmModalBackdrop.addEventListener('click', (ev) => {
+  if (ev.target === asmModalBackdrop) closeAssemblyModal();
+});
+
+/* -------------------------
+   Stamp palette export
+   ------------------------- */
+btnExportStampPalette.addEventListener('click', () => {
+  if (!tileData || !paletteData) { alert('Need tiles and palette loaded.'); return; }
+  const stampSize = parseInt(settingStampSize.value, 10);
+  const palette = parsePaletteFromData(paletteData);
+  const totalTiles = Math.floor(tileData.length / 32);
+  const maxPhysicalStamps = Math.floor(totalTiles / (stampSize/8*stampSize/8));
+  const stampsPerRow = 16;
+  const rows = Math.ceil(maxPhysicalStamps / stampsPerRow);
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = stampsPerRow * stampSize;
+  tempCanvas.height = rows * stampSize;
+  const tctx = tempCanvas.getContext('2d');
+  tctx.imageSmoothingEnabled = false;
+  for (let i = 0; i < maxPhysicalStamps; i++) {
+    const row = Math.floor(i / stampsPerRow);
+    const col = i % stampsPerRow;
+    const logicalID = (stampSize === 32) ? (i * 4 + 4) : (i + 4);
+    renderSingleStamp(tctx, logicalID, col * stampSize, row * stampSize, stampSize, tileData, palette);
+  }
+  tempCanvas.toBlob((blob) => {
+    if (!blob) { alert('Failed to create PNG'); return; }
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    a.href = url;
+    a.download = `stamp_palette_${new Date().toISOString().replace(/[:.]/g,'-')}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, 'image/png');
+});
+
+/* -------------------------
+   Initial Load
+   ------------------------- */
+clearMainCanvas();
+renderIfReady();
+updateZoomIndicator(); // Initialize zoom indicator
+
+</script>
+</body>
+</html>
