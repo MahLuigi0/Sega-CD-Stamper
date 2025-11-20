@@ -4,7 +4,7 @@
 
 -   **Interactive stamp editor**
     
-    -   Load, view and edit stamp maps (binary `.bin` / `.unc`).
+    -   Load, view and edit stamp maps (binary `.bin` / `.unc` / `kos`).
         
     -   Active-stamp preview with H-flip and rotation controls.
         
@@ -24,7 +24,7 @@
         
     -   Export tile atlas or stamp map palette to PNG.
         
-    -   Save edited stamp map as binary `.bin`.
+    -   Save edited stamp map as binary `.bin` or `.kos`.
         
     -   Generate 68K assembly (`.asm`) with configurable formatting (labels, words/line, comments).
         
