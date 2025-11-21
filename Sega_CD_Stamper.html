@@ -266,20 +266,22 @@
         <legend>Input Files</legend>
         <label>Tile art:
           <div style="display:flex; gap:8px; align-items:center;">
-            <input id="fileTiles" type="file" accept=".bin,.unc,.kos">
+            <input id="fileTiles" type="file" accept=".bin,.unc,.kos,.kosplus">
             <select id="fileTilesFormat" title="Select input format for tiles">
               <option value="uncompressed">Uncompressed</option>
               <option value="kosinski">Kosinski</option>
+              <option value="kosinski-plus">Kosinski Plus</option>
             </select>
           </div>
         </label>
         <label>Palette: <input id="filePalette" type="file" accept=".bin,.pal,.unc"></label>
         <label>Stamp map:
           <div style="display:flex; gap:8px; align-items:center;">
-            <input id="fileStampMap" type="file" accept=".bin,.unc,.kos">
+            <input id="fileStampMap" type="file" accept=".bin,.unc,.kos,.kosplus">
             <select id="fileStampMapFormat" title="Select input format for stamp map">
               <option value="uncompressed">Uncompressed</option>
               <option value="kosinski">Kosinski</option>
+              <option value="kosinski-plus">Kosinski Plus</option>
             </select>
           </div>
         </label>
@@ -325,6 +327,7 @@
             <select id="saveMapFormat">
               <option value="uncompressed">Uncompressed</option>
               <option value="kosinski">Kosinski</option>
+              <option value="kosinski-plus">Kosinski Plus</option>
             </select>
           </label>
           <button id="btnSaveMap" class="btn btn-success">Save Map</button>
@@ -698,6 +701,262 @@ function kosinskiCompress(buffer) {
 }
 
 /* -------------------------
+   Kosinski Plus compressor / decompressor (added)
+   - kosinskiPlusDecompress(buffer) -> Uint8Array
+   - kosinskiPlusCompress(buffer) -> Uint8Array
+   These are adapted from the user's Kosinski Plus tool and kept as separate functions
+   so both algorithms are available in the Stamper.
+   ------------------------- */
+
+function kosinskiPlusDecompress(buffer) {
+    const src = new Uint8Array(buffer);
+    let srcPos = 0;
+    
+    let dst = new Uint8Array(65536);
+    let dstPos = 0;
+
+    function ensureDst(n) {
+        if (dstPos + n > dst.length) {
+            let newSize = dst.length * 2;
+            while (newSize < dstPos + n) newSize *= 2;
+            const nDst = new Uint8Array(newSize);
+            nDst.set(dst);
+            dst = nDst;
+        }
+    }
+
+    let desc = 0, bitsLeft = 0;
+
+    function getBit() {
+        if (bitsLeft === 0) {
+            if (srcPos >= src.length) return 1;
+            desc = src[srcPos++];
+            bitsLeft = 8;
+        }
+        const bit = (desc & 0x80) ? 1 : 0;
+        desc = (desc << 1) & 0xFF;
+        bitsLeft--;
+        return bit;
+    }
+
+    function getByte() {
+        return (srcPos < src.length) ? src[srcPos++] : 0;
+    }
+
+    while (srcPos < src.length || bitsLeft > 0) {
+        if (getBit() === 1) {
+            ensureDst(1);
+            dst[dstPos++] = getByte();
+        } else {
+            if (getBit() === 0) {
+                const o = getByte();
+                const offset = o | 0xFFFFFF00;
+                let count = 2;
+                if (getBit()) count += 2;
+                if (getBit()) count += 1;
+                
+                ensureDst(count);
+                const start = dstPos + offset;
+                for (let i = 0; i < count; i++) dst[dstPos++] = dst[start + i];
+            } else {
+                const h = getByte();
+                const l = getByte();
+                const offset = (((h & 0xF8) << 5) | l) | 0xFFFFE000;
+                const c = h & 7;
+                
+                if (c !== 0) {
+                    const count = 10 - c;
+                    ensureDst(count);
+                    const start = dstPos + offset;
+                    for (let i = 0; i < count; i++) dst[dstPos++] = dst[start + i];
+                } else {
+                    const ext = getByte();
+                    if (ext === 0) break; 
+                    const count = ext + 9;
+                    ensureDst(count);
+                    const start = dstPos + offset;
+                    for (let i = 0; i < count; i++) dst[dstPos++] = dst[start + i];
+                }
+            }
+        }
+    }
+    return dst.slice(0, dstPos);
+}
+
+class KP_BitStreamWriter {
+    constructor() {
+        this.out = []; 
+        this.descByte = 0;
+        this.bitsUsed = 0;
+        this.dataBuffer = [];
+    }
+
+    putBit(bit) {
+        // Flush ONLY if we are starting a NEW descriptor group (i.e., previous one is full)
+        if (this.bitsUsed === 8) {
+            this.flushDesc();
+        }
+
+        if (bit) {
+            this.descByte |= (1 << (7 - this.bitsUsed));
+        }
+        this.bitsUsed++;
+    }
+
+    putByte(b) {
+        this.dataBuffer.push(b & 0xFF);
+    }
+
+    flushDesc() {
+        this.out.push(this.descByte);
+        for (let b of this.dataBuffer) {
+            this.out.push(b);
+        }
+        this.descByte = 0;
+        this.bitsUsed = 0;
+        this.dataBuffer = [];
+    }
+
+    finalize() {
+        // Flush if there is any data pending, even if bitsUsed is 8 (full descriptor)
+        if (this.bitsUsed > 0) {
+            this.flushDesc();
+        }
+        return new Uint8Array(this.out);
+    }
+}
+
+function kosinskiPlusCompress(buffer) {
+    const src = new Uint8Array(buffer);
+    const len = src.length;
+    const writer = new KP_BitStreamWriter();
+    
+    // Compression Parameters
+    const WIN_SIZE = 8192;
+    const MAX_MATCH = 264; 
+
+    // Hash Chain
+    const head = new Int32Array(65536).fill(-1);
+    const prev = new Int32Array(len).fill(-1);
+
+    function addNode(pos) {
+        if (pos + 1 >= len) return;
+        const key = (src[pos] << 8) | src[pos+1];
+        prev[pos] = head[key];
+        head[key] = pos;
+    }
+
+    let i = 0;
+
+    while (i < len) {
+        addNode(i);
+
+        let bestLen = 0;
+        let bestOff = 0;
+        
+        if (i + 1 < len) {
+            const key = (src[i] << 8) | src[i+1];
+            let node = head[key];
+            
+            // Skip self
+            if (node === i) node = prev[i];
+
+            const minIdx = Math.max(0, i - WIN_SIZE);
+            let chainLen = 256; 
+
+            while (node >= minIdx && chainLen-- > 0) {
+                if (src[node + bestLen] === src[i + bestLen]) {
+                    let l = 0;
+                    while (l < MAX_MATCH && (i + l) < len && src[node + l] === src[i + l]) {
+                        l++;
+                    }
+
+                    if (l > bestLen) {
+                        bestLen = l;
+                        bestOff = node - i;
+                        if (bestLen >= MAX_MATCH) break;
+                    }
+                }
+                node = prev[node];
+            }
+        }
+
+        let useLiteral = true;
+
+        if (bestLen >= 2) {
+            if (bestLen >= 3) {
+                useLiteral = false;
+            } else {
+                // Len 2 only valid for short match
+                if (bestOff >= -256) {
+                    useLiteral = false;
+                }
+            }
+        }
+
+        if (useLiteral) {
+            writer.putBit(1);
+            writer.putByte(src[i]);
+            i++;
+        } else {
+            const isShortValid = (bestOff >= -256) && (bestLen >= 2 && bestLen <= 5);
+            
+            if (isShortValid) {
+                // Code 00
+                writer.putBit(0);
+                writer.putBit(0);
+                writer.putByte(bestOff & 0xFF);
+                
+                const lenCode = bestLen - 2;
+                writer.putBit((lenCode >> 1) & 1);
+                writer.putBit(lenCode & 1);
+                
+            } else {
+                // Code 01
+                writer.putBit(0);
+                writer.putBit(1);
+                
+                const mask = bestOff & 0x1FFF;
+                const l = mask & 0xFF;
+                const h_base = (mask >> 5) & 0xF8;
+                
+                let c = 0;
+                let extByte = -1;
+                
+                if (bestLen <= 9) {
+                    c = 10 - bestLen;
+                } else {
+                    c = 0;
+                    extByte = bestLen - 9;
+                }
+                
+                const h = h_base | c;
+                writer.putByte(h);
+                writer.putByte(l);
+                
+                if (c === 0) {
+                    writer.putByte(extByte);
+                }
+            }
+
+            for (let k = 1; k < bestLen; k++) {
+                if (i + k < len) addNode(i + k);
+            }
+            i += bestLen;
+        }
+    }
+
+    // Write Terminator
+    writer.putBit(0);
+    writer.putBit(1);
+    writer.putByte(0xF8);
+    writer.putByte(0xFF);
+    writer.putByte(0x00); 
+
+    return writer.finalize();
+}
+
+/* -------------------------
    Helpers & Initial State
    ------------------------- */
 btnExport.disabled = true;
@@ -773,7 +1032,7 @@ function clearMainCanvas() {
 }
 
 /* -------------------------
-   File input handlers (with Kosinski support)
+   File input handlers (with Kosinski + Kosinski-Plus support)
    ------------------------- */
 fileTiles.addEventListener('change', async (e) => {
   const f = e.target.files[0];
@@ -781,8 +1040,11 @@ fileTiles.addEventListener('change', async (e) => {
   try {
     const rawBuffer = await f.arrayBuffer();
     if (fileTilesFormat.value === 'kosinski') {
-      // Decompress
+      // Decompress using original Kosinski
       tileData = kosinskiDecompress(rawBuffer);
+    } else if (fileTilesFormat.value === 'kosinski-plus') {
+      // Decompress using Kosinski Plus
+      tileData = kosinskiPlusDecompress(rawBuffer);
     } else {
       tileData = new Uint8Array(rawBuffer);
     }
@@ -824,6 +1086,8 @@ fileStampMap.addEventListener('change', async (e) => {
       const rawBuffer = await f.arrayBuffer();
       if (fileStampMapFormat.value === 'kosinski') {
         stampMapData = kosinskiDecompress(rawBuffer);
+      } else if (fileStampMapFormat.value === 'kosinski-plus') {
+        stampMapData = kosinskiPlusDecompress(rawBuffer);
       } else {
         stampMapData = new Uint8Array(rawBuffer);
       }
@@ -1372,7 +1636,7 @@ btnClearMap.addEventListener('click', () => {
 });
 
 /* -------------------------
-   Save Map (with Kosinski compression option)
+   Save Map (with Kosinski and Kosinski Plus compression option)
    ------------------------- */
 btnSaveMap.addEventListener('click', async () => {
   if (!editableStampMapData) { alert('No map data to save.'); return; }
@@ -1380,9 +1644,13 @@ btnSaveMap.addEventListener('click', async () => {
     let outBytes;
     let filenameBase = sanitizeLabel(stampMapFilename) || `genesis-map-${new Date().toISOString().replace(/[:.]/g,'-')}`;
     if (saveMapFormat.value === 'kosinski') {
-      // compress
+      // compress with original Kosinski
       outBytes = kosinskiCompress(editableStampMapData.buffer);
       filenameBase += '.kos';
+    } else if (saveMapFormat.value === 'kosinski-plus') {
+      // compress with Kosinski Plus
+      outBytes = kosinskiPlusCompress(editableStampMapData.buffer);
+      filenameBase += '.kosplus';
     } else {
       outBytes = editableStampMapData;
       filenameBase += '.bin';
