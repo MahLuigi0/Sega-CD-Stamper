@@ -1,3 +1,9 @@
+<div align="center">
+    <img src="screenshot.jpeg" alt="screenshot">
+    <br>
+</div>
+<br>
+
 # Sega-CD-Stamper
 
 # Features
