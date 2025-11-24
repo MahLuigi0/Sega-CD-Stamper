@@ -117,12 +117,12 @@
 
     label {
       display: block;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       font-size: 0.85rem;
       color: var(--text-secondary);
     }
 
-    input[type="file"], select, input[type="number"] {
+    select, input[type="number"] {
       width: 100%;
       background-color: var(--bg-control);
       border: 1px solid var(--border-color);
@@ -131,8 +131,64 @@
       border-radius: 4px;
       font-size: 0.9rem;
     }
-    input[type="file"] { padding: 4px; }
+    
     select { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23e1e1e1' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1em; padding-right: 2em; }
+
+    /* --- Custom File Input Styling --- */
+    input[type="file"] {
+      display: none; /* Hide the ugly default input */
+    }
+
+    .file-input-group {
+      margin-bottom: 12px;
+    }
+
+    .file-input-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .file-upload-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 12px;
+      background-color: var(--bg-control);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      transition: background-color 0.2s, color 0.2s;
+      flex-shrink: 0;
+      min-width: 90px;
+    }
+
+    .file-upload-btn:hover {
+      background-color: var(--primary-accent);
+      color: white;
+      border-color: var(--primary-accent);
+    }
+
+    .file-upload-btn svg {
+      margin-right: 6px;
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
+    .file-name-display {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      font-style: italic;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
 
     .btn {
       display: inline-block;
@@ -264,27 +320,52 @@
     <aside class="panel left-sidebar">
       <fieldset>
         <legend>Input Files</legend>
-        <label>Tile art:
-          <div style="display:flex; gap:8px; align-items:center;">
+        
+        <!-- Tile Art Input -->
+        <div class="file-input-group">
+          <label>Tile Art:</label>
+          <div class="file-input-row">
             <input id="fileTiles" type="file" accept=".bin,.unc,.kos,.kosplus">
+            <label for="fileTiles" class="file-upload-btn">
+               <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg> Upload
+            </label>
             <select id="fileTilesFormat" title="Select input format for tiles">
               <option value="uncompressed">Uncompressed</option>
               <option value="kosinski">Kosinski</option>
               <option value="kosinski-plus">Kosinski Plus</option>
             </select>
           </div>
-        </label>
-        <label>Palette: <input id="filePalette" type="file" accept=".bin,.pal,.unc"></label>
-        <label>Stamp map:
-          <div style="display:flex; gap:8px; align-items:center;">
+          <span id="fileTilesName" class="file-name-display">No file chosen</span>
+        </div>
+
+        <!-- Palette Input -->
+        <div class="file-input-group">
+          <label>Palette:</label>
+          <div class="file-input-row">
+            <input id="filePalette" type="file" accept=".bin,.pal,.unc">
+            <label for="filePalette" class="file-upload-btn" style="width:100%">
+               <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg> Upload Palette
+            </label>
+          </div>
+          <span id="filePaletteName" class="file-name-display">No file chosen</span>
+        </div>
+
+        <!-- Stamp Map Input -->
+        <div class="file-input-group">
+          <label>Stamp Map:</label>
+          <div class="file-input-row">
             <input id="fileStampMap" type="file" accept=".bin,.unc,.kos,.kosplus">
+            <label for="fileStampMap" class="file-upload-btn">
+               <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg> Upload
+            </label>
             <select id="fileStampMapFormat" title="Select input format for stamp map">
               <option value="uncompressed">Uncompressed</option>
               <option value="kosinski">Kosinski</option>
               <option value="kosinski-plus">Kosinski Plus</option>
             </select>
           </div>
-        </label>
+          <span id="fileStampMapName" class="file-name-display">No file chosen</span>
+        </div>
       </fieldset>
 
       <fieldset>
@@ -305,7 +386,7 @@
             <option value="128x128">128x128 (4096x4096px)</option>
           </select>
         </label>
-        <label>Stamp Size (in pixels):
+        <label style="margin-top:8px;">Stamp Size (in pixels):
           <select id="settingStampSize">
             <option value="16" selected>16x16</option>
             <option value="32">32x32</option>
@@ -323,7 +404,7 @@
           <button id="btnView68k" class="btn" title="View the current stamp map as 68K words">View Assembly</button>
         </div>
         <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
-          <label style="flex:1;">Save Format:
+          <label style="flex:1; margin-bottom:0;">Save Format:
             <select id="saveMapFormat">
               <option value="uncompressed">Uncompressed</option>
               <option value="kosinski">Kosinski</option>
@@ -504,6 +585,27 @@ let panY = 0;
 let isDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
+
+/* -------------------------
+   Helper: File input visuals
+   ------------------------- */
+function setupFileInputVisuals(inputId, displayId) {
+  const input = document.getElementById(inputId);
+  const display = document.getElementById(displayId);
+  input.addEventListener('change', () => {
+    if (input.files && input.files.length > 0) {
+      display.textContent = input.files[0].name;
+      display.title = input.files[0].name; // Tooltip for long names
+    } else {
+      display.textContent = 'No file chosen';
+      display.title = '';
+    }
+  });
+}
+setupFileInputVisuals('fileTiles', 'fileTilesName');
+setupFileInputVisuals('filePalette', 'filePaletteName');
+setupFileInputVisuals('fileStampMap', 'fileStampMapName');
+
 
 function sanitizeLabel(name) {
   if (!name) return 'stamp_map';
